@@ -2085,21 +2085,21 @@ void ZNtupleDumper::InitExtraCalibTree()
 	extraCalibTree->Branch("AlphaRecHitSCEle1", &(AlphaRecHitSCEle[0]));
 	extraCalibTree->Branch("AlphaRecHitSCEle2", &(AlphaRecHitSCEle[1]));
 	extraCalibTree->Branch("ampliErrUncalibRecHitSCEle1", &(ampliErrUncalibRecHitSCEle[0]));
-	extraCalibTree->Branch("ampliErrUncalibRecHitSCEle1", &(ampliErrUncalibRecHitSCEle[1]));
+	extraCalibTree->Branch("ampliErrUncalibRecHitSCEle2", &(ampliErrUncalibRecHitSCEle[1]));
 	extraCalibTree->Branch("ampliUncalibRecHitSCEle1", &(ampliUncalibRecHitSCEle[0]));
-	extraCalibTree->Branch("ampliUncalibRecHitSCEle1", &(ampliUncalibRecHitSCEle[1]));
+	extraCalibTree->Branch("ampliUncalibRecHitSCEle2", &(ampliUncalibRecHitSCEle[1]));
         extraCalibTree->Branch("chi2UncalibRecHitSCEle1", &(chi2UncalibRecHitSCEle[0]));
-        extraCalibTree->Branch("chi2UncalibRecHitSCEle1", &(chi2UncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("chi2UncalibRecHitSCEle2", &(chi2UncalibRecHitSCEle[1]));
         extraCalibTree->Branch("flagsUncalibRecHitSCEle1", &(flagsUncalibRecHitSCEle[0]));
-        extraCalibTree->Branch("flagsUncalibRecHitSCEle1", &(flagsUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("flagsUncalibRecHitSCEle2", &(flagsUncalibRecHitSCEle[1]));
         extraCalibTree->Branch("jitterErrUncalibRecHitSCEle1", &(jitterErrUncalibRecHitSCEle[0]));
-        extraCalibTree->Branch("jitterErrUncalibRecHitSCEle1", &(jitterErrUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("jitterErrUncalibRecHitSCEle2", &(jitterErrUncalibRecHitSCEle[1]));
         extraCalibTree->Branch("jitterUncalibRecHitSCEle1", &(jitterUncalibRecHitSCEle[0]));
-        extraCalibTree->Branch("jitterUncalibRecHitSCEle1", &(jitterUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("jitterUncalibRecHitSCEle2", &(jitterUncalibRecHitSCEle[1]));
         extraCalibTree->Branch("ootAmplitudesUncalibRecHitSCEle1", &(ootAmplisUncalibRecHitSCEle[0]));
-        extraCalibTree->Branch("ootAmplitudesUncalibRecHitSCEle1", &(ootAmplisUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("ootAmplitudesUncalibRecHitSCEle2", &(ootAmplisUncalibRecHitSCEle[1]));
         extraCalibTree->Branch("pedUncalibRecHitSCEle1", &(pedEUncalibRecHitSCEle[0]));
-        extraCalibTree->Branch("pedUncalibRecHitSCEle1", &(pedEUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("pedUncalibRecHitSCEle2", &(pedEUncalibRecHitSCEle[1]));
 
 	return;
 }
