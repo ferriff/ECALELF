@@ -74,6 +74,8 @@
 #include "DataFormats/EcalDetId/interface/EBDetId.h"
 #include "DataFormats/EcalDetId/interface/EEDetId.h"
 #include "DataFormats/EcalDetId/interface/ESDetId.h"
+//#include "DataFormats/EcalRecHit/interface/EcalRecHit.h"
+//#include "DataFormats/EcalRecHit/interface/EcalUncalibratedRecHit.h"
 #include "DataFormats/CaloRecHit/interface/CaloID.h"
 
 #include "Geometry/CaloTopology/interface/CaloTopology.h"
@@ -186,6 +188,8 @@ private:
 	edm::Handle<edm::TriggerResults> triggerResultsHandle;
 	edm::Handle<edm::TriggerResults> WZSkimResultsHandle;
 	edm::Handle<EcalRecHitCollection> ESRechitsHandle;
+        edm::Handle<EcalUncalibratedRecHitCollection> pEBUncRecHits;
+        edm::Handle<EcalUncalibratedRecHitCollection> pEEUncRecHits;
 
 	//------------------------------ Input Tags
 	// input tag for primary vertex
@@ -199,9 +203,13 @@ private:
 #ifdef CMSSW_7_2_X
 	edm::EDGetTokenT<EcalRecHitCollection> recHitCollectionEBTAG;
 	edm::EDGetTokenT<EcalRecHitCollection> recHitCollectionEETAG;
+	edm::EDGetTokenT<EcalUncalibratedRecHitCollection> ebURHToken_;
+	edm::EDGetTokenT<EcalUncalibratedRecHitCollection> eeURHToken_;
 #else
 	edm::InputTag recHitCollectionEBTAG;
 	edm::InputTag recHitCollectionEETAG;
+	edm::InputTag ebURHToken_;
+	edm::InputTag eeURHToken_;
 #endif
 
 	edm::InputTag recHitCollectionESTAG;
@@ -334,6 +342,14 @@ private:
 	std::vector<float>     LCRecHitSCEle[3];
 	std::vector<float>     ICRecHitSCEle[3];
 	std::vector<float>  AlphaRecHitSCEle[3];
+        std::vector<float*> ootAmplisUncalibRecHitSCEle[3];
+	std::vector<float> ampliUncalibRecHitSCEle[3];
+	std::vector<float> ampliErrUncalibRecHitSCEle[3];
+        std::vector<float> pedEUncalibRecHitSCEle[3];
+        std::vector<float> jitterUncalibRecHitSCEle[3];
+        std::vector<float> jitterErrUncalibRecHitSCEle[3];
+        std::vector<float> chi2UncalibRecHitSCEle[3];
+        std::vector<uint32_t> flagsUncalibRecHitSCEle[3];
 	//==============================
 
 	//============================== check ele-id and iso
@@ -385,6 +401,7 @@ private:
 	DetId findSCseed(const reco::SuperCluster& cluster);
 
 	void InitExtraCalibTree(void);
+        void resetExtraVariables(int index);
 	void TreeSetExtraCalibVar(const pat::Electron& electron1, int index);
 	void TreeSetExtraCalibVar(const reco::SuperCluster& electron1, int index);
 	void TreeSetExtraCalibVar(const pat::Photon& photon, int index);
@@ -392,6 +409,8 @@ private:
 	void TreeSetExtraCalibVar(const pat::Electron& electron1, const pat::Electron& electron2);
 	void TreeSetExtraCalibVar(const pat::Electron& electron1, const reco::SuperCluster& electron2);
 	void TreeSetExtraCalibVar(const pat::Photon& photon, const pat::Muon& muon1, const pat::Muon& muon2);
+        void TreeSetExtraCalibVar(const std::vector<std::pair<DetId, float> > & hitsFracs, int index, bool isEB);
+
 
 	void InitEleIDTree(void);
 
@@ -463,9 +482,13 @@ ZNtupleDumper::ZNtupleDumper(const edm::ParameterSet& iConfig):
 #ifdef CMSSW_7_2_X
 	recHitCollectionEBTAG(consumes<EcalRecHitCollection>(iConfig.getParameter<edm::InputTag>( "recHitCollectionEB" ))),
 	recHitCollectionEETAG(consumes<EcalRecHitCollection>(iConfig.getParameter<edm::InputTag>( "recHitCollectionEE" ))),
+	ebURHToken_(consumes<EcalRecHitCollection>(iConfig.getParameter<edm::InputTag>( "uncalibRecHitCollectionEB" ))),
+	eeURHToken_(consumes<EcalRecHitCollection>(iConfig.getParameter<edm::InputTag>( "uncalibRecHitCollectionEE" ))),
 #else
 	recHitCollectionEBTAG(iConfig.getParameter<edm::InputTag>("recHitCollectionEB")),
 	recHitCollectionEETAG(iConfig.getParameter<edm::InputTag>("recHitCollectionEE")),
+	ebURHToken_(iConfig.getParameter<edm::InputTag>( "uncalibRecHitCollectionEB" )),
+	eeURHToken_(iConfig.getParameter<edm::InputTag>( "uncalibRecHitCollectionEE" )),
 #endif
 
 	recHitCollectionESTAG(iConfig.getParameter<edm::InputTag>("recHitCollectionES")),
@@ -634,6 +657,8 @@ void ZNtupleDumper::analyze(const edm::Event& iEvent, const edm::EventSetup& iSe
 	//------------------------------
 	clustertools = new EcalClusterLazyTools (iEvent, iSetup, recHitCollectionEBTAG,
 	        recHitCollectionEETAG);
+        iEvent.getByToken(ebURHToken_, pEBUncRecHits);
+        iEvent.getByToken(eeURHToken_, pEEUncRecHits);
 
 	//------------------------------ electrons
 	if (eventType == ZMMG) {
@@ -2059,6 +2084,22 @@ void ZNtupleDumper::InitExtraCalibTree()
 	extraCalibTree->Branch("ICRecHitSCEle2", &(ICRecHitSCEle[1]));
 	extraCalibTree->Branch("AlphaRecHitSCEle1", &(AlphaRecHitSCEle[0]));
 	extraCalibTree->Branch("AlphaRecHitSCEle2", &(AlphaRecHitSCEle[1]));
+	extraCalibTree->Branch("ampliErrUncalibRecHitSCEle1", &(ampliErrUncalibRecHitSCEle[0]));
+	extraCalibTree->Branch("ampliErrUncalibRecHitSCEle1", &(ampliErrUncalibRecHitSCEle[1]));
+	extraCalibTree->Branch("ampliUncalibRecHitSCEle1", &(ampliUncalibRecHitSCEle[0]));
+	extraCalibTree->Branch("ampliUncalibRecHitSCEle1", &(ampliUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("chi2UncalibRecHitSCEle1", &(chi2UncalibRecHitSCEle[0]));
+        extraCalibTree->Branch("chi2UncalibRecHitSCEle1", &(chi2UncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("flagsUncalibRecHitSCEle1", &(flagsUncalibRecHitSCEle[0]));
+        extraCalibTree->Branch("flagsUncalibRecHitSCEle1", &(flagsUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("jitterErrUncalibRecHitSCEle1", &(jitterErrUncalibRecHitSCEle[0]));
+        extraCalibTree->Branch("jitterErrUncalibRecHitSCEle1", &(jitterErrUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("jitterUncalibRecHitSCEle1", &(jitterUncalibRecHitSCEle[0]));
+        extraCalibTree->Branch("jitterUncalibRecHitSCEle1", &(jitterUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("ootAmplitudesUncalibRecHitSCEle1", &(ootAmplisUncalibRecHitSCEle[0]));
+        extraCalibTree->Branch("ootAmplitudesUncalibRecHitSCEle1", &(ootAmplisUncalibRecHitSCEle[1]));
+        extraCalibTree->Branch("pedUncalibRecHitSCEle1", &(pedEUncalibRecHitSCEle[0]));
+        extraCalibTree->Branch("pedUncalibRecHitSCEle1", &(pedEUncalibRecHitSCEle[1]));
 
 	return;
 }
@@ -2079,36 +2120,110 @@ void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Electron& electron1, const r
 	return;
 }
 
-void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Electron& electron1, int index)
+void ZNtupleDumper::resetExtraVariables(int index)
 {
+        unsigned int aidx = abs(index);
+	recoFlagRecHitSCEle[aidx].clear();
+	rawIdRecHitSCEle[aidx].clear();
+	XRecHitSCEle[aidx].clear();
+	YRecHitSCEle[aidx].clear();
+	ZRecHitSCEle[aidx].clear();
+	energyRecHitSCEle[aidx].clear();
+        ampliErrUncalibRecHitSCEle[aidx].clear();
+        ampliUncalibRecHitSCEle[aidx].clear();
+        chi2UncalibRecHitSCEle[aidx].clear();
+        flagsUncalibRecHitSCEle[aidx].clear();
+        jitterErrUncalibRecHitSCEle[aidx].clear();
+        jitterUncalibRecHitSCEle[aidx].clear();
+        ootAmplisUncalibRecHitSCEle[aidx].clear();
+        pedEUncalibRecHitSCEle[aidx].clear();
+	LCRecHitSCEle[aidx].clear();
+	ICRecHitSCEle[aidx].clear();
+	AlphaRecHitSCEle[aidx].clear();
+}
 
-	if(index < 0) {
-		recoFlagRecHitSCEle[-index].clear();
-		rawIdRecHitSCEle[-index].clear();
-		XRecHitSCEle[-index].clear();
-		YRecHitSCEle[-index].clear();
-		ZRecHitSCEle[-index].clear();
-		energyRecHitSCEle[-index].clear();
-		LCRecHitSCEle[-index].clear();
-		ICRecHitSCEle[-index].clear();
-		AlphaRecHitSCEle[-index].clear();
-		return;
+void ZNtupleDumper::TreeSetExtraCalibVar(const std::vector<std::pair<DetId, float> > & hitsFracs, int index, bool isEB)
+{
+	const EcalRecHitCollection *recHits = isEB ? clustertools->getEcalEBRecHitCollection() : clustertools->getEcalEERecHitCollection();
+	const EcalUncalibratedRecHitCollection * uncHits = isEB ? pEBUncRecHits.product() : pEEUncRecHits.product();
+	const EcalIntercalibConstantMap& icalMap = clustertools->getEcalIntercalibConstants();
+	const edm::ESHandle<EcalLaserDbService>& laserHandle_ = clustertools->getLaserHandle();
+	for (std::vector<std::pair<DetId, float> >::const_iterator detitr = hitsFracs.begin();
+	        detitr != hitsFracs.end(); detitr++ ) {
+		//      EcalRecHitCollection::const_iterator theSeedHit = recHits->find (id); // trash this
+		EcalRecHitCollection::const_iterator oneHit = recHits->find( (detitr -> first) ) ;
+		if(oneHit == recHits->end()) {
+			edm::LogError("ZNtupleDumper") << "No intercalib const found for xtal "  << (detitr->first).rawId()
+			                               << " in subdetector " << (detitr->first).subdetId() << " bailing out";
+			//assert(0);
+			continue;
+		}
+		recoFlagRecHitSCEle[index].push_back(oneHit->recoFlag());
+		rawIdRecHitSCEle[index].push_back(detitr->first.rawId());
+		if(isEB) {
+			EBDetId recHitId(detitr->first);
+			XRecHitSCEle[index].push_back(recHitId.ieta());
+			YRecHitSCEle[index].push_back(recHitId.iphi());
+			ZRecHitSCEle[index].push_back(recHitId.zside());
+		} else {
+			EEDetId recHitId(detitr->first);
+			XRecHitSCEle[index].push_back(recHitId.ix());
+			YRecHitSCEle[index].push_back(recHitId.iy());
+			ZRecHitSCEle[index].push_back(recHitId.zside());
+		}
+		energyRecHitSCEle[index].push_back(oneHit->energy());
+		EcalUncalibratedRecHitCollection::const_iterator oneUHit = uncHits->find( (detitr -> first) ) ;
+		if(oneUHit == uncHits->end()) {
+			edm::LogError("ZNtupleDumper") << "No uncalibRecHit found for xtal "  << (detitr->first).rawId()
+			                               << " in subdetector " << (detitr->first).subdetId() << " bailing out";
+			//assert(0);
+			continue;
+		}
+                // UncalibRecHit's information on OOT amplitudes
+                float amplis[EcalDataFrame::MAXSAMPLES];
+                for (int i = 0; i < EcalDataFrame::MAXSAMPLES; ++i) amplis[i] = oneUHit->outOfTimeAmplitude(i);
+                ootAmplisUncalibRecHitSCEle[index].push_back(amplis);
+                ampliUncalibRecHitSCEle[index].push_back(oneUHit->amplitude());
+                ampliErrUncalibRecHitSCEle[index].push_back(oneUHit->amplitudeError());
+                pedEUncalibRecHitSCEle[index].push_back(oneUHit->pedestal());
+                jitterUncalibRecHitSCEle[index].push_back(oneUHit->jitter());
+                jitterErrUncalibRecHitSCEle[index].push_back(oneUHit->jitterError());
+                chi2UncalibRecHitSCEle[index].push_back(oneUHit->chi2());
+                flagsUncalibRecHitSCEle[index].push_back(oneUHit->flags());
+		// in order to get back the ADC counts from the recHit energy, three ingredients are necessary:
+		// 1) get laser correction coefficient
+		LCRecHitSCEle[index].push_back(laserHandle_->getLaserCorrection(detitr->first, runTime_));
+		//laserHandle->
+		// 2) get intercalibration
+		EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+		EcalIntercalibConstant icalconst = 1.;
+		if( icalit != icalMap.end() ) {
+			icalconst = (*icalit);
+			// std::cout << "icalconst set to: " << icalconst << std::endl;
+		} else {
+			edm::LogError("ZNtupleDumper") << "No intercalib const found for xtal "  << (detitr->first).rawId() << "bailing out";
+			//assert(0);
+			continue;
+		}
+		// 3) get adc2GeV
+		//float adcToGeV = ( (detitr -> first).subdetId() == EcalBarrel ) ?
+		// float(adcToGeVHandle->getEBValue()) : float(adcToGeVHandle->getEEValue());
+		ICRecHitSCEle[index].push_back(icalconst);
 	}
 
-	recoFlagRecHitSCEle[index].clear();
-	rawIdRecHitSCEle[index].clear();
-	XRecHitSCEle[index].clear();
-	YRecHitSCEle[index].clear();
-	ZRecHitSCEle[index].clear();
-	energyRecHitSCEle[index].clear();
-	LCRecHitSCEle[index].clear();
-	ICRecHitSCEle[index].clear();
-	AlphaRecHitSCEle[index].clear();
+}
+
+void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Electron& electron1, int index)
+{
+        resetExtraVariables(index);
+        if (index < 0) return;
 
 	//  EcalIntercalibConstantMap icMap = icHandle->get()
 	std::vector< std::pair<DetId, float> > hitsAndFractions_ele1 = electron1.superCluster()->hitsAndFractions();
 	nHitsSCEle[index] = hitsAndFractions_ele1.size();
 
+
+        // from HERE
 	const EcalRecHitCollection *recHits = (electron1.isEB()) ?  clustertools->getEcalEBRecHitCollection() : clustertools->getEcalEERecHitCollection();
 	const EcalIntercalibConstantMap& icalMap = clustertools->getEcalIntercalibConstants();
 	const edm::ESHandle<EcalLaserDbService>& laserHandle_ = clustertools->getLaserHandle();
@@ -2156,35 +2271,15 @@ void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Electron& electron1, int ind
 		// float(adcToGeVHandle->getEBValue()) : float(adcToGeVHandle->getEEValue());
 		ICRecHitSCEle[index].push_back(icalconst);
 	}
+        TreeSetExtraCalibVar(hitsAndFractions_ele1, index, electron1.isEB());
 
 	return;
 }
 
 void ZNtupleDumper::TreeSetExtraCalibVar(const reco::SuperCluster& electron1, int index)
 {
-
-	if(index < 0) {
-		recoFlagRecHitSCEle[-index].clear();
-		rawIdRecHitSCEle[-index].clear();
-		XRecHitSCEle[-index].clear();
-		YRecHitSCEle[-index].clear();
-		ZRecHitSCEle[-index].clear();
-		energyRecHitSCEle[-index].clear();
-		LCRecHitSCEle[-index].clear();
-		ICRecHitSCEle[-index].clear();
-		AlphaRecHitSCEle[-index].clear();
-		return;
-	}
-
-	recoFlagRecHitSCEle[index].clear();
-	rawIdRecHitSCEle[index].clear();
-	XRecHitSCEle[index].clear();
-	YRecHitSCEle[index].clear();
-	ZRecHitSCEle[index].clear();
-	energyRecHitSCEle[index].clear();
-	LCRecHitSCEle[index].clear();
-	ICRecHitSCEle[index].clear();
-	AlphaRecHitSCEle[index].clear();
+        resetExtraVariables(index);
+        if (index < 0) return;
 
 	std::vector< std::pair<DetId, float> > hitsAndFractions_ele1 = electron1.hitsAndFractions();
 	nHitsSCEle[index] = hitsAndFractions_ele1.size();
@@ -2275,29 +2370,8 @@ void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Photon& photon, const pat::M
 
 void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Photon& photon, int index)
 {
-
-	if(index < 0) {
-		recoFlagRecHitSCEle[-index].clear();
-		rawIdRecHitSCEle[-index].clear();
-		XRecHitSCEle[-index].clear();
-		YRecHitSCEle[-index].clear();
-		ZRecHitSCEle[-index].clear();
-		energyRecHitSCEle[-index].clear();
-		LCRecHitSCEle[-index].clear();
-		ICRecHitSCEle[-index].clear();
-		AlphaRecHitSCEle[-index].clear();
-		return;
-	}
-
-	recoFlagRecHitSCEle[index].clear();
-	rawIdRecHitSCEle[index].clear();
-	XRecHitSCEle[index].clear();
-	YRecHitSCEle[index].clear();
-	ZRecHitSCEle[index].clear();
-	energyRecHitSCEle[index].clear();
-	LCRecHitSCEle[index].clear();
-	ICRecHitSCEle[index].clear();
-	AlphaRecHitSCEle[index].clear();
+        resetExtraVariables(index);
+        if (index < 0) return;
 
 	//  EcalIntercalibConstantMap icMap = icHandle->get()
 	std::vector< std::pair<DetId, float> > hitsAndFractions_ele1 = photon.superCluster()->hitsAndFractions();
@@ -2356,30 +2430,8 @@ void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Photon& photon, int index)
 
 void ZNtupleDumper::TreeSetExtraCalibVar(const pat::Muon& muon1, int index)
 {
-
-	if(index < 0) {
-		recoFlagRecHitSCEle[-index].clear();
-		rawIdRecHitSCEle[-index].clear();
-		XRecHitSCEle[-index].clear();
-		YRecHitSCEle[-index].clear();
-		ZRecHitSCEle[-index].clear();
-		energyRecHitSCEle[-index].clear();
-		LCRecHitSCEle[-index].clear();
-		ICRecHitSCEle[-index].clear();
-		AlphaRecHitSCEle[-index].clear();
-		return;
-	}
-
-	recoFlagRecHitSCEle[index].clear();
-	rawIdRecHitSCEle[index].clear();
-	XRecHitSCEle[index].clear();
-	YRecHitSCEle[index].clear();
-	ZRecHitSCEle[index].clear();
-	energyRecHitSCEle[index].clear();
-	LCRecHitSCEle[index].clear();
-	ICRecHitSCEle[index].clear();
-	AlphaRecHitSCEle[index].clear();
-
+        resetExtraVariables(index);
+        if (index < 0) return;
 	return;
 }
 
